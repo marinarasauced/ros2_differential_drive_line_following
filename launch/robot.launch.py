@@ -42,6 +42,12 @@ def generate_launch_description():
             'param',
             TURTLEBOT3_MODEL + '.yaml'))
 
+    tb3_launch_dir = LaunchConfiguration(
+        'tb3_launch_dir',
+        default=os.path.join(
+            get_package_share_directory('turtlebot3_bringup'),
+            'launch'))
+
     if LDS_MODEL == 'LDS-01':
         lidar_pkg_dir = LaunchConfiguration(
             'lidar_pkg_dir',
@@ -84,7 +90,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                [ThisLaunchFileDir(), '/turtlebot3_state_publisher.launch.py']),
+                [tb3_launch_dir, '/turtlebot3_state_publisher.launch.py']),
             launch_arguments={'use_sim_time': use_sim_time}.items(),
         ),
 
