@@ -108,31 +108,31 @@ geometry_msgs/Pose2D error
 
 The `k1` and `k2` values are control input gains used to calculate the angular control input values during rotations and translations. The linear model is as follows:
 
-1. **Global state** (`x`):
-   - \( X = [x_{global}, y_{global}, \theta_{global}] \)
+1. **Global state** (`X`):
+   - `X` = [`x_global`, `y_global`, `theta_global`]
 
 By projecting the global coordinates of the vehicle onto the vector from the source pose to the target pose (assuming the vector is the x-axis of the newly defined local-coordinate frame), the linear model and control input are rewritten as an error-reduction model.
 
-2. **Local error** (`e`):
-   - \( E = [e_{y_{local}}, e_{\theta_{local}}] \)
+2. **Local error** (`E`):
+   - `E` = [`e_y`, `e_theta`]
    - Where:
-     - \( e_{y} = y_{target} - y_{local} \)
-     - \( e_{\theta} = \theta_{target} - \theta_{local} \)
+     - `e_y` = `y_target` - `y_local` in the local coordinate frame such that `y_target` equals zero.
+     - `e_theta` = `theta_target` - `theta_local` in the local coordinate frame such that `theta_target` equals zero.
 
-3. **State derivatives** (`de/dt`):
-   - \( \dot{E} = [-\dot{y_{local}}, -\dot{\theta_{local}}] \)
+3. **Local error derivatives** (`dot(E)`):
+   - `dot(E)` = [-`dot(y_local)`, -`dot(theta_local)`]
    - Where:
-     - \( \dot{y} \) is the change in the local y-coordinate.
-     - \( \dot{\theta} \) is the change in the local orientation.
+     - `dot(y_local)` is the change in the local y-coordinate.
+     - `dot(theta_local)` is the change in the local orientation.
 
 The transition between the source and target states is split into three segments: rotation, translation, rotation. The control input are calculated as:
 
 4. **Control inputs** (`u`):
-   - \( U = [0.0, -`k2` * e_{\theta_{local}}] \) during rotations.
-   - \( U = [max(u_{linear}), -`k1` * \theta_{target} -`k2` * e_{\theta_{local}}] \)
+   - `U` = [0.0, -`k2` * `e_theta`] during rotations.
+   - `U` = [`max(u_lin)`, -`k1` * `e_y` -`k2` * `e_theta`] during translations.
    - Where:
-     - \( v_{linear} \) is the linear velocity.
-     - \( v_{angular} \) is the angular velocity.
+     - `u1` is the constant linear velocity control inuput.
+     - `u2` is the angular velocity control input.
 
 The linear velocity input controls the rate of the vehicle in its body-fixed x-axis, and the angular velocity input controls the rate about the vehicle's body-fixed z-axis. Control input are capped using the hardware-specified maximum allowable linear and angular velocities along with an artificial velocity ration `v_ratio` such that u_max = v_ratio * v_max.
 
