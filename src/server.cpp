@@ -79,6 +79,7 @@ namespace mess2_ugv_actions {
     void LineFollowingActionServer::handle_loop(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result)
     {
         auto current_stamp = this->get_clock()->now();
+        // auto vicon_stamp = rclcpp::Time(vicon_stamp_, rclcpp::Clock::ROS_TIME);
         if (goal_handle->is_canceling()) {
             (void) ugv_control(0.0, 0.0);
             result->success = false;
@@ -93,13 +94,13 @@ namespace mess2_ugv_actions {
             RCLCPP_INFO(this->get_logger(), "goal cancelled due to actor exceeding experimental boundaries");
             busy_ = false;
             return;
-        } else if ((current_stamp - vicon_stamp_).seconds() > timeout_localization) {
-            (void) ugv_control(0.0, 0.0);
-            result->success = false;
-            goal_handle->canceled(result);
-            RCLCPP_INFO(this->get_logger(), "goal cancelled due to actor localization timeout");
-            busy_ = false;
-            return;
+        // } else if ((current_stamp - vicon_stamp_).seconds() > timeout_localization) {
+        //     (void) ugv_control(0.0, 0.0);
+        //     result->success = false;
+        //     goal_handle->canceled(result);
+        //     RCLCPP_INFO(this->get_logger(), "goal cancelled due to actor localization timeout");
+        //     busy_ = false;
+        //     return;
         }
     }
 
