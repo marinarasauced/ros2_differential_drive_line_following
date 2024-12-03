@@ -101,11 +101,6 @@ namespace mess2_ugv_actions {
                 } else if (goal->boundaries_max.x < goal->boundaries_min.x || goal->boundaries_max.y < goal->boundaries_min.y) {
                     RCLCPP_INFO(this->get_logger(), "rejected goal because boundaries are not consistent; i.e., max < min");
                     return rclcpp_action::GoalResponse::REJECT;
-
-                // case : model is empty string or none
-                } else if (goal->model == "") {
-                    RCLCPP_INFO(this->get_logger(), "rejected goal because model cannot be \"\"");
-                    return rclcpp_action::GoalResponse::REJECT;
                 }
 
                 // case : the vehicle is available and the goal is valid
