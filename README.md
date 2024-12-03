@@ -109,7 +109,7 @@ geometry_msgs/Pose2D error
 
 #### Subscriptions
 
-- **`/vicon/name/name`** (string)
+- **`/vicon/name/name`**
 
     The topic on which localization data is published from the ROS2 VICON driver node; `name` is replaced with the vehicle's name from the launch file.
 
