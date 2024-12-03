@@ -127,7 +127,7 @@ By projecting the global coordinates of the vehicle onto the vector from the sou
 
 The transition between the source and target states is split into three segments: rotation, translation, rotation. The control input are calculated as:
 
-4. **Control inputs** (`u`):
+4. **Control inputs** (`U`):
    - `U` = [0.0, -`k2` * `e_theta`] during rotations.
    - `U` = [`max(u_lin)`, -`k1` * `e_y` -`k2` * `e_theta`] during translations.
    - Where:
