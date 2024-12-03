@@ -83,14 +83,14 @@ Creates an action server using the following action defintion:
 # goal definition
 # this action's goal contains the actors target point and action specific parameters pertaining to the vehicle's dynamics and control.
 
-string model        # the TurtleBot3 model used to find the allowable maximum velocities.
-float64 k1
-float64 k2
-float64 v_ratio      # a ratio limiting the vehicle's maximum velocities; i.e., if the absolute maximum allowable linear velocity is 1.0 m/s and v_ratio is 0.7, the vehicle's maximum linear velocity during the action is 0.7 m/s.
+float64 k1          # the linear control input gain
+float64 k2          # the angular control input gain
+float64 v_ratio     # a ratio limiting the vehicle's maximum velocities; i.e., if the absolute maximum allowable linear velocity is 1.0 m/s and v_ratio is 0.7, the vehicle's maximum linear velocity during the action is 0.7 m/s.
 geometry_msgs/Pose2D tolerances     # the allowable rotational and translational error toleranaces
 geometry_msgs/Point boundaries_min  # the lower boundaries of the three-dimensional space the vehicle is allowed to operate within (based on localization x, y, z).
 geometry_msgs/Point boundaries_max  # the upper boundaries of the three-dimensional space the vehicle is allowed to operate within (based on localization x, y, z).
 geometry_msgs/Pose2D x_target       # the target state of the vehicle
+
 ---
 
 # result definition
@@ -104,8 +104,38 @@ bool success
 # this action's feedback contains the current local error during a transition.
 
 geometry_msgs/Pose2D error
-
 ```
+
+The `k1` and `k2` values are control input gains used to calculate the angular control input values during rotations and translations. The linear model is as follows:
+
+1. **Global state** (`x`):
+   - \( X = [x_{global}, y_{global}, \theta_{global}] \)
+
+By projecting the global coordinates of the vehicle onto the vector from the source pose to the target pose (assuming the vector is the x-axis of the newly defined local-coordinate frame), the linear model and control input are rewritten as an error-reduction model.
+
+2. **Local error** (`e`):
+   - \( E = [e_{y_{local}}, e_{\theta_{local}}] \)
+   - Where:
+     - \( e_{y} = y_{target} - y_{local} \)
+     - \( e_{\theta} = \theta_{target} - \theta_{local} \)
+
+3. **State derivatives** (`de/dt`):
+   - \( \dot{E} = [-\dot{y_{local}}, -\dot{\theta_{local}}] \)
+   - Where:
+     - \( \dot{y} \) is the change in the local y-coordinate.
+     - \( \dot{\theta} \) is the change in the local orientation.
+
+The transition between the source and target states is split into three segments: rotation, translation, rotation. The control input are calculated as:
+
+4. **Control inputs** (`u`):
+   - \( U = [0.0, -`k2` * e_{\theta_{local}}] \) during rotations.
+   - \( U = [max(u_{linear}), -`k1` * \theta_{target} -`k2` * e_{\theta_{local}}] \)
+   - Where:
+     - \( v_{linear} \) is the linear velocity.
+     - \( v_{angular} \) is the angular velocity.
+
+The linear velocity input controls the rate of the vehicle in its body-fixed x-axis, and the angular velocity input controls the rate about the vehicle's body-fixed z-axis. Control input are capped using the hardware-specified maximum allowable linear and angular velocities along with an artificial velocity ration `v_ratio` such that u_max = v_ratio * v_max.
+
 
 #### Subscriptions
 
