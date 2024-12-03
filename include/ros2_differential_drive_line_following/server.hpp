@@ -134,6 +134,7 @@ namespace mess2_ugv_actions {
 
             vicon_subscription_ = this->create_subscription<TransformStamped>(vicon_topic, 10, std::bind(&LineFollowingActionServer::ugv_localization, this, std::placeholders::_1));
             cmd_vel_publisher_ = this->create_publisher<Twist>(cmd_vel_topic, 10);
+            busy_ = false;
         }
 
     private:
