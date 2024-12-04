@@ -110,13 +110,12 @@ namespace mess2_ugv_actions {
         rclcpp::Rate rate(10);
         auto goal = goal_handle->get_goal();
         while (rclcpp::ok() && std::abs(e_local_.theta > tolerances_.theta)) {
-            (void) handle_loop(goal_handle, result);
-
             double u_ang = -goal->k2 * e_local_.theta;
             (void) ugv_control(0.0, u_ang);
 
             feedback->error = e_local_;
             goal_handle->publish_feedback(feedback);
+            (void) handle_loop(goal_handle, result);
             rate.sleep();
         }
         (void) ugv_control(0.0, 0.0);
@@ -128,13 +127,12 @@ namespace mess2_ugv_actions {
         rclcpp::Rate rate(10);
         auto goal = goal_handle->get_goal();
         while (rclcpp::ok() && std::abs(e_local_.theta > tolerances_.theta)) {
-            (void) handle_loop(goal_handle, result);
-
             double u_ang = -goal->k1 * e_local_.y -goal->k2 * e_local_.theta;
             (void) ugv_control(u_lin_max_, u_ang);
 
             feedback->error = e_local_;
             goal_handle->publish_feedback(feedback);
+            (void) handle_loop(goal_handle, result);
             rate.sleep();
         }
         (void) ugv_control(0.0, 0.0);
@@ -151,7 +149,6 @@ namespace mess2_ugv_actions {
         auto result = std::make_shared<LineFollowingAction::Result>();
         auto feedback = std::make_shared<LineFollowingAction::Feedback>();
 
-        assert(goal->v_ratio > 0.0 && goal->v_ratio <= 1.0);
         u_lin_max_ = v_lin_max_ * goal->v_ratio;
         u_ang_max_ = v_ang_max_ * goal->v_ratio;
 
@@ -162,18 +159,19 @@ namespace mess2_ugv_actions {
         e_local_.y = std::numeric_limits<double>::infinity();
         e_local_.theta = std::numeric_limits<double>::infinity();
 
-        x_source_.x = x_global_.x;
-        x_source_.y = x_global_.y;
         x_target_ = goal->x_target;
         x_target_.theta = mess2_plugins::wrap_angle_to_pi(x_target_.theta);
 
-        rclcpp::sleep_for(std::chrono::milliseconds(100));
+        rclcpp::sleep_for(std::chrono::milliseconds(50));
 
         while (rclcpp::ok() && receiving_ == false) {
             RCLCPP_INFO(this->get_logger(), "waiting to receive localization");
             (void) handle_loop(goal_handle, result);
             rate.sleep();
         }
+
+        x_source_.x = x_global_.x;
+        x_source_.y = x_global_.y;
 
         mode = "r1";
         (void) handle_rotation(goal_handle, result, feedback);
