@@ -43,7 +43,7 @@ namespace mess2_ugv_actions {
         std::string model;
         std::string vicon_topic;
         std::string cmd_vel_topic;
-        std::string mode = "r1";
+        std::string mode = "none";
         double timeout_localization = 1.0;
 
         explicit LineFollowingActionServer() : Node("line_following_action_server")
@@ -113,6 +113,7 @@ namespace mess2_ugv_actions {
             {
                 RCLCPP_INFO(this->get_logger(), "received request to cancel goal");
                 (void)goal_handel;
+                (void) ugv_control(0.0, 0.0);
                 return rclcpp_action::CancelResponse::ACCEPT;
             };
 
@@ -141,6 +142,7 @@ namespace mess2_ugv_actions {
         rclcpp_action::Server<LineFollowingAction>::SharedPtr line_following_server_;
         bool busy_ = true; // a boolean indicating whether the vehicle is currently busy.
         bool receiving_ = false; // a boolean indicating whether localization data is being received.
+        bool ready_ = false;
         rclcpp::Subscription<TransformStamped>::SharedPtr vicon_subscription_;
         rclcpp::Publisher<Twist>::SharedPtr cmd_vel_publisher_;
 
@@ -188,7 +190,7 @@ namespace mess2_ugv_actions {
          * @param goal_handle a shared pointer to the goal handle.
          * @param result a shared pointer to the goal's result.
          */
-        void handle_loop(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result);
+        bool handle_loop(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result);
 
 
         /**
@@ -198,7 +200,7 @@ namespace mess2_ugv_actions {
          * @param result a shared pointer to the goal's result.
          * @param feedback a shared pointer to the goal's feedback.
          */
-        void handle_rotation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback);
+        bool handle_rotation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback);
 
 
         /**
@@ -208,7 +210,7 @@ namespace mess2_ugv_actions {
          * @param result a shared pointer to the goal's result.
          * @param feedback a shared pointer to the goal's feedback.
          */
-        void handle_translation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback);
+        bool handle_translation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback);
 
 
         /**

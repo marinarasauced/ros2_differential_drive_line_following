@@ -30,6 +30,7 @@ namespace mess2_ugv_actions {
         auto rotq = msg->transform.rotation; // the orientation structure from the message as a quaternion.
         auto rote = mess2_plugins::convert_quaternion_to_euler_angles(rotq); // the orientation structure from the message as euler angles.
         x_global_.theta = mess2_plugins::wrap_angle_to_pi(rote.yaw);
+//        RCLCPP_INFO(this->get_logger(), "\nglobal:\ttheta = %.3f, local = %.3f", x_global_.theta, e_local_.theta);
 
         // add logic for alternative localization methods incase of VICON occlusion.
 
@@ -64,19 +65,23 @@ namespace mess2_ugv_actions {
                 e_local_.x = b * std::cos(alpha);
                 e_local_.y = b * std::sin(alpha) * std::copysign(1.0, beta - theta);
                 e_local_.theta = mess2_plugins::wrap_angle_to_pi(x_global_.theta - theta);
+                ready_ = true;
             // local error w.r.t the heading of the target state
             } else if (mode == "r2") {
                 e_local_.x = x_target_.x - x_global_.x;
                 e_local_.y = x_target_.y - x_global_.y;
-                e_local_.theta = mess2_plugins::wrap_angle_to_pi(x_global_.theta - x_target_.x);
+                e_local_.theta = mess2_plugins::wrap_angle_to_pi(x_global_.theta - x_target_.theta);
+                ready_ = true;
             }
         }
 
+        // RCLCPP_INFO(this->get_logger(), "\nx: \t\tglobal = %.3f, local = %.3f\ny: \t\tglobal = %.3f, local = %.3f\ntheta: \tglobal = %.3f, local = %.3f", x_global_.x, e_local_.x, x_global_.y, e_local_.y, x_global_.theta, e_local_.theta);
         receiving_ = true;
+        // RCLCPP_INFO(this->get_logger(), "x: %.2f, y: %.2f, theta: %.2f", e_local_.x, e_local_.y, e_local_.theta);
     }
 
 
-    void LineFollowingActionServer::handle_loop(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result)
+    bool LineFollowingActionServer::handle_loop(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result)
     {
         auto current_stamp = this->get_clock()->now();
         // auto vicon_stamp = rclcpp::Time(vicon_stamp_, rclcpp::Clock::ROS_TIME);
@@ -86,14 +91,14 @@ namespace mess2_ugv_actions {
             goal_handle->canceled(result);
             RCLCPP_INFO(this->get_logger(), "goal cancelled by request");
             busy_ = false;
-            return;
+            return false;
         } else if (x_global_.x < boundaries_min_.x || x_global_.x > boundaries_max_.x || x_global_.y < boundaries_min_.y || x_global_.y > boundaries_max_.y) {
             (void) ugv_control(0.0, 0.0);
             result->success = false;
             goal_handle->canceled(result);
             RCLCPP_INFO(this->get_logger(), "goal cancelled due to actor exceeding experimental boundaries");
             busy_ = false;
-            return;
+            return false;
         // } else if ((current_stamp - vicon_stamp_).seconds() > timeout_localization) {
         //     (void) ugv_control(0.0, 0.0);
         //     result->success = false;
@@ -102,40 +107,49 @@ namespace mess2_ugv_actions {
         //     busy_ = false;
         //     return;
         }
+        return true;
     }
 
 
-    void LineFollowingActionServer::handle_rotation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback)
+    bool LineFollowingActionServer::handle_rotation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback)
     {
         rclcpp::Rate rate(10);
         auto goal = goal_handle->get_goal();
-        while (rclcpp::ok() && std::abs(e_local_.theta > tolerances_.theta)) {
+        while (std::abs(e_local_.theta) > tolerances_.theta) {
             double u_ang = -goal->k2 * e_local_.theta;
             (void) ugv_control(0.0, u_ang);
 
             feedback->error = e_local_;
             goal_handle->publish_feedback(feedback);
-            (void) handle_loop(goal_handle, result);
+            if (handle_loop(goal_handle, result) == false) {
+                (void) ugv_control(0.0, 0.0);
+                return false;
+            }
             rate.sleep();
         }
         (void) ugv_control(0.0, 0.0);
+        return true;
     }
 
 
-    void LineFollowingActionServer::handle_translation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback)
+    bool LineFollowingActionServer::handle_translation(std::shared_ptr<LineFollowingGoalHandle> goal_handle, std::shared_ptr<LineFollowingAction::Result> result, std::shared_ptr<LineFollowingAction::Feedback> feedback)
     {
         rclcpp::Rate rate(10);
         auto goal = goal_handle->get_goal();
-        while (rclcpp::ok() && std::abs(e_local_.theta > tolerances_.theta)) {
+        while (e_local_.x > tolerances_.x) {
             double u_ang = -goal->k1 * e_local_.y -goal->k2 * e_local_.theta;
             (void) ugv_control(u_lin_max_, u_ang);
 
             feedback->error = e_local_;
             goal_handle->publish_feedback(feedback);
-            (void) handle_loop(goal_handle, result);
+            if (handle_loop(goal_handle, result) == false) {
+                (void) ugv_control(0.0, 0.0);
+                return false;
+            }
             rate.sleep();
         }
         (void) ugv_control(0.0, 0.0);
+        return true;
     }
 
 
@@ -154,42 +168,73 @@ namespace mess2_ugv_actions {
 
         boundaries_min_ = goal->boundaries_min;
         boundaries_max_ = goal->boundaries_max;
+        tolerances_ = goal->tolerances;
 
         e_local_.x = std::numeric_limits<double>::infinity();
         e_local_.y = std::numeric_limits<double>::infinity();
         e_local_.theta = std::numeric_limits<double>::infinity();
 
+        x_source_.x = x_global_.x;
+        x_source_.y = x_global_.y;
         x_target_ = goal->x_target;
         x_target_.theta = mess2_plugins::wrap_angle_to_pi(x_target_.theta);
+        mode = "r1";
 
-        rclcpp::sleep_for(std::chrono::milliseconds(50));
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
 
-        while (rclcpp::ok() && receiving_ == false) {
+        while (receiving_ == false) {
             RCLCPP_INFO(this->get_logger(), "waiting to receive localization");
             (void) handle_loop(goal_handle, result);
             rate.sleep();
         }
 
-        x_source_.x = x_global_.x;
-        x_source_.y = x_global_.y;
-
         mode = "r1";
-        (void) handle_rotation(goal_handle, result, feedback);
+        ready_ = false;
+        while (ready_ == false) {
+            RCLCPP_INFO(this->get_logger(), "waiting for local error update");
+            (void) handle_loop(goal_handle, result);
+            rate.sleep();
+        }
+        // RCLCPP_INFO(this->get_logger(), "r1");
+        if (handle_rotation(goal_handle, result, feedback) == false) {
+            (void) ugv_control(0.0, 0.0);
+            return;
+        }
 
         mode = "t1";
-        (void) handle_translation(goal_handle, result, feedback);
+        ready_ = false;
+        while (ready_ == false) {
+            RCLCPP_INFO(this->get_logger(), "waiting for local error update");
+            (void) handle_loop(goal_handle, result);
+            rate.sleep();
+        }
+        // RCLCPP_INFO(this->get_logger(), "t1");
+        if (handle_translation(goal_handle, result, feedback) == false) {
+            (void) ugv_control(0.0, 0.0);
+            return;
+        }
 
         mode = "r2";
-        (void) handle_rotation(goal_handle, result, feedback);
-        
-        mode = "r1";
+        ready_ = false;
+        while (ready_ == false) {
+            // RCLCPP_INFO(this->get_logger(), "waiting for local error update");
+            (void) handle_loop(goal_handle, result);
+            rate.sleep();
+        }
+        RCLCPP_INFO(this->get_logger(), "r2");
+        if (handle_rotation(goal_handle, result, feedback) == false) {
+            (void) ugv_control(0.0, 0.0);
+            return;
+        }
+
+        mode = "none";
         if (rclcpp::ok()) {
             (void) ugv_control(0.0, 0.0);
             result->success = true;
             goal_handle->succeed(result);
             RCLCPP_INFO(this->get_logger(), "goal succeeded");
-            busy_ = false;
         }
+        busy_ = false;
     }
 } // namespace mess2_ugv_actions
 
